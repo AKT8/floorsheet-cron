@@ -1,0 +1,29 @@
+name: Floorsheet Fetch
+
+on:
+  schedule:
+    - cron: '15 12 * * *'  # 6:00 PM NPT
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Backfill days"
+        default: "1"
+        required: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - run: node scripts/fetch_floorsheet.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BACKFILL: ${{ github.event.inputs.days }}
