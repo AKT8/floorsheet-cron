@@ -49,12 +49,15 @@ async function fetchDay(date) {
 
 // Get dates back N days
 function getDatesBack(days) {
-  return [...Array(days).keys()].map(i => {
+  const dates = [];
+  for (let i = 1; i <= days; i++) {   // start from yesterday
     const d = new Date();
     d.setDate(d.getDate() - i);
-    return d.toISOString().slice(0, 10);
-  });
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
 }
+
 
 // Main runner
 async function run() {
