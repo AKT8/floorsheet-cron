@@ -39,11 +39,11 @@ async function fetchDay(date) {
     if (rows.length) {
       const { error } = await supabase
         .from("floorsheet")
-        .insert(rows, { returning: "minimal" });
-
-      if (error) console.error(error.message);
+        .insert(rows, { ignoreDuplicates: true, returning: "minimal" });
+    
+      if (error) console.error("Insert error:", error.message);
     }
-
+    
     page++;
   }
 }
