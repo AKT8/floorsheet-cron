@@ -30,9 +30,9 @@ async function fetchDay(date) {
       s: r.symbol,
       b: r.buyerMemberId,
       se: r.sellerMemberId,
-      q: r.quantity,
-      p: r.rate,
-      a: r.amount
+      q: r.contractQuantity,
+      p: r.contractRate,
+      a: r.contractAmount
     }));
 
     if (rows.length) {
