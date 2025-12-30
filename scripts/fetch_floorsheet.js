@@ -26,7 +26,7 @@ async function fetchDay(date) {
 
     const rows = data.content.map(r => ({
       d: date,
-        t: r.tradeTime.split("T")[1].split(".")[0], // HH:MM:SS only
+      t: r.tradeTime.split("T")[1].split(".")[0], // HH:MM:SS only
       s: r.symbol,
       b: r.buyerMemberId,
       se: r.sellerMemberId,
