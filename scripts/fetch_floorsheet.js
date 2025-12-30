@@ -28,6 +28,7 @@ async function fetchDay(date) {
       d: date,
       t: r.tradeTime.split("T")[1].split(".")[0], // HH:MM:SS only
       s: r.symbol,
+      i: r.contractId,
       b: r.buyerMemberId,
       se: r.sellerMemberId,
       q: r.contractQuantity,
