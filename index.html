@@ -1,37 +1,95 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Supabase + GitHub Pages</title>
+  <title>Floorsheet Viewer</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 16px;
+      background: #020617;
+    }
+
+    th, td {
+      border: 1px solid #1e293b;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: #020617;
+      position: sticky;
+      top: 0;
+      cursor: pointer;
+    }
+
+    tr:nth-child(even) {
+      background: #020617;
+    }
+
+    tr:hover {
+      background: #020617;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>My Supabase Data</h1>
-  <ul id="list"></ul>
+  <h1>📊 Floorsheet Table</h1>
+
+  <table id="dataTable">
+    <thead></thead>
+    <tbody></tbody>
+  </table>
 
   <script>
     const supabaseUrl = "https://xvrxzdfaildozjtxfgai.supabase.co"
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2cnh6ZGZhaWxkb3pqdHhmZ2FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTc5NDcsImV4cCI6MjA4MjU5Mzk0N30.jizniNYCJYFGimJSz_WmTlQBAN-DMNFqcgddjS1YIlU"
+    const supabaseKey = "YOUR_ANON_KEY"
     const supabase = supabase.createClient(supabaseUrl, supabaseKey)
 
-    async function loadData() {
+    async function loadTable() {
       const { data, error } = await supabase
         .from("floorsheet")
         .select("*")
+        .limit(100) // don’t nuke the browser 😅
 
       if (error) {
         console.error(error)
         return
       }
 
-      const list = document.getElementById("list")
-      data.forEach(row => {
-        const li = document.createElement("li")
-        li.textContent = JSON.stringify(row)
-        list.appendChild(li)
-      })
+      if (!data || data.length === 0) {
+        console.warn("No data returned")
+        return
+      }
+
+      const tableHead = document.querySelector("#dataTable thead")
+      const tableBody = document.querySelector("#dataTable tbody")
+
+      // build headers
+      const headers = Object.keys(data[0])
+      tableHead.innerHTML =
+        "<tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr>"
+
+      // build rows
+      tableBody.innerHTML = data.map(row =>
+        "<tr>" +
+          headers.map(h => `<td>${row[h]}</td>`).join("") +
+        "</tr>"
+      ).join("")
     }
 
-    loadData()
+    loadTable()
   </script>
 </body>
 </html>
