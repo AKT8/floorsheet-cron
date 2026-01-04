@@ -59,7 +59,7 @@
 
     async function loadTable() {
       const { data, error } = await supabase
-        .from("floorsheet")
+        .from("public.floorsheet")
         .select("*")
         .limit(100) // don’t nuke the browser 😅
 
