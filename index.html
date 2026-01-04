@@ -15,7 +15,7 @@
 
     async function loadData() {
       const { data, error } = await supabase
-        .from("your_table_name")
+        .from("floorsheet")
         .select("*")
 
       if (error) {
