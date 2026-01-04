@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Supabase + GitHub Pages</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>My Supabase Data</h1>
+  <ul id="list"></ul>
+
+  <script>
+    const supabaseUrl = "https://YOUR_PROJECT_ID.supabase.co"
+    const supabaseKey = "YOUR_PUBLIC_ANON_KEY"
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey)
+
+    async function loadData() {
+      const { data, error } = await supabase
+        .from("your_table_name")
+        .select("*")
+
+      if (error) {
+        console.error(error)
+        return
+      }
+
+      const list = document.getElementById("list")
+      data.forEach(row => {
+        const li = document.createElement("li")
+        li.textContent = JSON.stringify(row)
+        list.appendChild(li)
+      })
+    }
+
+    loadData()
+  </script>
+</body>
+</html>
