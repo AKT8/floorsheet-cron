@@ -9,9 +9,8 @@ const supabase = createClient(
 
 const BASE = "https://sharehubnepal.com/live/api/v2/floorsheet";
 
-// ----------------------
+
 // Utility to chunk arrays
-// ----------------------
 function chunk(arr, size = 200) {
   const chunks = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -20,9 +19,8 @@ function chunk(arr, size = 200) {
   return chunks;
 }
 
-// ----------------------
+
 // Fetch floorsheet for a single day
-// ----------------------
 async function fetchDay(date) {
   let page = 1;
   let totalPages = 1;
@@ -76,16 +74,18 @@ async function fetchDay(date) {
   }
 }
 
-// ----------------------
+
 // Get last N trading days to fill 21-day window
 // Only missing floorsheet days are returned
-// ----------------------
 async function getMissingTradingDates(targetDays = 21) {
-  // Fetch existing trading days in Supabase
-  const { data: existingDates } = await supabase
-    .from("floorsheet")
-    .select("d")
-    .distinct();
+  // Fetch existing trading days from the database using RPC
+  const { data: existingDates, error } = await supabase
+    .rpc("get_distinct_floorsheet_dates"); 
+
+  if (error) {
+    console.error("Error fetching existing dates:", error.message);
+    return [];
+  }
 
   const existingSet = new Set(existingDates.map(r => r.d));
 
@@ -112,20 +112,17 @@ async function getMissingTradingDates(targetDays = 21) {
   return missingDates.reverse();
 }
 
-// ----------------------
-// Optional: cleanup old rows >21 trading days
-// ----------------------
+// cleanup old rows >21 trading days
 async function cleanupOldRows(targetDays = 21) {
   try {
-    await supabase.rpc("cleanup_old_floorsheet"); // assumes you've created the Supabase function
+    await supabase.rpc("cleanup_old_floorsheet"); 
   } catch (err) {
     console.error("Cleanup error:", err.message);
   }
 }
 
-// ----------------------
+
 // Main runner
-// ----------------------
 async function run() {
   // Determine backfill or daily mode
   const BACKFILL = Number(process.env.BACKFILL || 0);
