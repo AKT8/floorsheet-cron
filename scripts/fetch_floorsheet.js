@@ -10,6 +10,14 @@ const supabase = createClient(
 const BASE =
   "https://sharehubnepal.com/live/api/v2/floorsheet";
 
+function chunk(arr, size = 200) {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 // Fetch one full day (all pages)
 async function fetchDay(date) {
   let page = 1;
@@ -36,6 +44,12 @@ async function fetchDay(date) {
       a: r.contractAmount
     }));
 
+    if (!rows.length) {
+      console.log("No data for", date, "page", page);
+      break; // stop paging for this date
+    }
+
+    // upsert in chunks
     for (const batch of chunk(rows, 200)) {
       const { error } = await supabase
         .from("floorsheet")
@@ -46,7 +60,7 @@ async function fetchDay(date) {
         });
 
       if (error && !error.message.includes("duplicate")) {
-        console.error(error.message);
+        console.error("Upsert error:", error.message);
       }
     }
 
