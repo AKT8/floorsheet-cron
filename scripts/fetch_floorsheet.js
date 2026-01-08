@@ -7,9 +7,11 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-const BASE =
-  "https://sharehubnepal.com/live/api/v2/floorsheet";
+const BASE = "https://sharehubnepal.com/live/api/v2/floorsheet";
 
+// ----------------------
+// Utility to chunk arrays
+// ----------------------
 function chunk(arr, size = 200) {
   const chunks = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -18,78 +20,142 @@ function chunk(arr, size = 200) {
   return chunks;
 }
 
-// Fetch one full day (all pages)
+// ----------------------
+// Fetch floorsheet for a single day
+// ----------------------
 async function fetchDay(date) {
   let page = 1;
   let totalPages = 1;
 
   while (page <= totalPages) {
-    const url = `${BASE}?Size=100&date=${date}&page=${page}`;
-    const res = await axios.get(url, { timeout: 15000 });
+    try {
+      const url = `${BASE}?Size=100&date=${date}&page=${page}`;
+      const res = await axios.get(url, { timeout: 15000 });
+      const data = res.data?.data;
 
-    const data = res.data?.data;
-    if (!data) break;
+      if (!data) break;
+      totalPages = data.totalPages;
 
-    totalPages = data.totalPages;
+      const rows = data.content.map(r => ({
+        d: date,
+        t: r.tradeTime.split("T")[1].split(".")[0],
+        s: r.symbol,
+        i: r.contractId,
+        b: r.buyerMemberId,
+        se: r.sellerMemberId,
+        q: r.contractQuantity,
+        p: r.contractRate,
+        a: r.contractAmount
+      }));
 
-    const rows = data.content.map(r => ({
-      d: date,
-      t: r.tradeTime.split("T")[1].split(".")[0],
-      s: r.symbol,
-      i: r.contractId,
-      b: r.buyerMemberId,
-      se: r.sellerMemberId,
-      q: r.contractQuantity,
-      p: r.contractRate,
-      a: r.contractAmount
-    }));
-
-    if (!rows.length) {
-      console.log("No data for", date, "page", page);
-      break; // stop paging for this date
-    }
-
-    // upsert in chunks
-    for (const batch of chunk(rows, 200)) {
-      const { error } = await supabase
-        .from("floorsheet")
-        .upsert(batch, {
-          onConflict: "i",
-          ignoreDuplicates: true,
-          returning: "minimal"
-        });
-
-      if (error && !error.message.includes("duplicate")) {
-        console.error("Upsert error:", error.message);
+      if (!rows.length) {
+        console.log("No floorsheet data for", date, "page", page);
+        break;
       }
+
+      // Upsert in chunks to avoid request size issues
+      for (const batch of chunk(rows, 200)) {
+        const { error } = await supabase
+          .from("floorsheet")
+          .upsert(batch, {
+            onConflict: "i",       // primary key conflict
+            ignoreDuplicates: true,
+            returning: "minimal"
+          });
+
+        if (error && !error.message.includes("duplicate")) {
+          console.error("Upsert error:", error.message);
+        }
+      }
+
+      page++;
+    } catch (err) {
+      console.error("Error fetching date", date, "page", page, err.message);
+      break;
     }
-
-    page++;
   }
 }
 
+// ----------------------
+// Get last N trading days to fill 21-day window
+// Only missing floorsheet days are returned
+// ----------------------
+async function getMissingTradingDates(targetDays = 21) {
+  // Fetch existing trading days in Supabase
+  const { data: existingDates } = await supabase
+    .from("floorsheet")
+    .select("d")
+    .distinct();
 
-// Get dates back N days
-function getDatesBack(days) {
-  const dates = [];
-  for (let i = 0; i <= days; i++) {   // start from today
+  const existingSet = new Set(existingDates.map(r => r.d));
+
+  // Generate past calendar days until we have enough missing days
+  const missingDates = [];
+  let i = 0;
+  const today = new Date();
+
+  while (missingDates.length < targetDays) {
     const d = new Date();
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().slice(0, 10));
+    d.setDate(today.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+
+    // Skip if already in table
+    if (!existingSet.has(iso)) missingDates.push(iso);
+
+    i++;
+
+    // Safety: stop after 60 days to prevent infinite loops
+    if (i > 60) break;
   }
-  return dates;
+
+  // Return oldest → newest
+  return missingDates.reverse();
 }
 
+// ----------------------
+// Optional: cleanup old rows >21 trading days
+// ----------------------
+async function cleanupOldRows(targetDays = 21) {
+  try {
+    await supabase.rpc("cleanup_old_floorsheet"); // assumes you've created the Supabase function
+  } catch (err) {
+    console.error("Cleanup error:", err.message);
+  }
+}
 
+// ----------------------
 // Main runner
+// ----------------------
 async function run() {
-  const DAYS = Number(process.env.BACKFILL || 1);
-  const dates = getDatesBack(DAYS);
+  // Determine backfill or daily mode
+  const BACKFILL = Number(process.env.BACKFILL || 0);
 
-  for (const d of dates) {
-    console.log("Fetching:", d);
+  let datesToFetch = [];
+
+  if (BACKFILL > 0) {
+    console.log("Backfill mode:", BACKFILL, "days");
+
+    // Get missing trading dates to complete 21-day window
+    datesToFetch = await getMissingTradingDates(BACKFILL);
+  } else {
+    console.log("Daily mode");
+    // Always fetch today only
+    const today = new Date().toISOString().slice(0, 10);
+    datesToFetch = [today];
+  }
+
+  console.log("Fetching dates:", datesToFetch);
+
+  // Fetch each date sequentially
+  for (const d of datesToFetch) {
+    console.log("Fetching floorsheet for:", d);
     await fetchDay(d);
   }
+
+  // Cleanup old rows to keep only last 21 trading days
+  await cleanupOldRows(21);
+
+  console.log("Floorsheet fetch + cleanup complete");
 }
 
 run();
