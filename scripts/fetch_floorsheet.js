@@ -26,7 +26,7 @@ async function fetchDay(date) {
 
     const rows = data.content.map(r => ({
       d: date,
-      t: r.tradeTime.split("T")[1].split(".")[0], // HH:MM:SS only
+      t: r.tradeTime.split("T")[1].split(".")[0],
       s: r.symbol,
       i: r.contractId,
       b: r.buyerMemberId,
@@ -36,22 +36,29 @@ async function fetchDay(date) {
       a: r.contractAmount
     }));
 
-    if (rows.length) {
+    for (const batch of chunk(rows, 200)) {
       const { error } = await supabase
         .from("floorsheet")
-        .insert(rows, { ignoreDuplicates: true, returning: "minimal" });
-    
-      if (error) console.error("Insert error:", error.message);
+        .upsert(batch, {
+          onConflict: "i",
+          ignoreDuplicates: true,
+          returning: "minimal"
+        });
+
+      if (error && !error.message.includes("duplicate")) {
+        console.error(error.message);
+      }
     }
-    
+
     page++;
   }
 }
 
+
 // Get dates back N days
 function getDatesBack(days) {
   const dates = [];
-  for (let i = 1; i <= days; i++) {   // start from yesterday
+  for (let i = 0; i <= days; i++) {   // start from today
     const d = new Date();
     d.setDate(d.getDate() - i);
     dates.push(d.toISOString().slice(0, 10));
